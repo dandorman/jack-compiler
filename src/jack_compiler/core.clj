@@ -1,4 +1,5 @@
-(ns jack-compiler.core)
+(ns jack-compiler.core
+  (:require [clojure.java.io :as io]))
 
 (defn char-seq
   "See <http://stackoverflow.com/questions/11669404/processing-a-file-character-by-character-in-clojure>"
@@ -160,7 +161,9 @@
           (cons (first tokens) (lazy-seq (concat (rest tokens) (lazy-seq (token-seq others)))))
           (recur (first others) (rest others) new-state new-current-token))))))
 
-(defn -main []
-  (let [chrs (char-seq (java.io.BufferedReader. *in*))
-        tokens (token-seq chrs)]
-    (println tokens)))
+(defn -main [& args]
+  (doseq [filename *command-line-args*]
+    (with-open [rdr (io/reader filename)]
+      (let [chrs (char-seq rdr)
+            tokens (token-seq chrs)]
+        (println tokens)))))
