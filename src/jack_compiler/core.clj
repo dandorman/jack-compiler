@@ -45,9 +45,6 @@
          (< (Integer/parseInt value) 32767))
     :integer
 
-    (re-matches #"^\"[^\"\n]*\"$" value)
-    :string
-
     (re-matches #"^[A-Za-z_][0-9A-Za-z_]*$" value)
     :identifier
 
@@ -64,6 +61,9 @@
 
     (= "/" chr)
     [:maybe-comment-start current-token tokens]
+
+    (= "\"" chr)
+    [:string current-token tokens]
 
     (some #(= chr %) jack-symbols)
     [:start [] [[(keyword chr) chr]]]
@@ -84,6 +84,11 @@
           token-type (classify-token value)]
       [:maybe-comment-start [] [[token-type value]]])
 
+    (= "\"" chr)
+    (let [value (apply str current-token)
+          token-type (classify-token value)]
+      [:string [] [[token-type value]]])
+
     (some #(= chr %) jack-symbols)
     (let [value (apply str current-token)
           token-type (classify-token value)]
@@ -100,6 +105,9 @@
 
     (= "/" chr)
     [:maybe-comment-start current-token tokens]
+
+    (= "\"" chr)
+    [:string current-token tokens]
 
     :else
     [:token (conj current-token chr) tokens]))
@@ -134,6 +142,12 @@
     [:start current-token tokens]
     [:comment current-token tokens]))
 
+(defmethod process-chr :string
+  [state chr current-token tokens]
+  (if (= "\"" chr)
+    [:start [] [[:string (apply str current-token)]]]
+    [:string (conj current-token chr) tokens]))
+
 (defn token-seq
   [chrs]
   (loop [chr (first chrs)
@@ -142,10 +156,10 @@
          current-token []
          tokens nil]
     (if chr
-      (if tokens
-        (cons (first tokens) (lazy-seq (concat (rest tokens) (lazy-seq (token-seq (cons chr others))))))
-        (let [[new-state new-current-token new-tokens] (process-chr state chr current-token tokens)]
-          ; (println {"state" new-state "token" new-current-token})
+      (let [[new-state new-current-token new-tokens] (process-chr state chr current-token tokens)]
+        ; (println {"state" new-state "token" new-current-token})
+        (if tokens
+          (cons (first tokens) (lazy-seq (concat (rest tokens) (lazy-seq (token-seq (cons chr others))))))
           (recur (first others) (rest others) new-state new-current-token new-tokens))))))
 
 (defn -main []
