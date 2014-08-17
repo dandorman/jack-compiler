@@ -49,7 +49,7 @@
     :identifier
 
     :else
-    :unknown))
+    (throw (Exception. (str "Unrecognized token: " value)))))
 
 (defmulti process-chr (fn [state & args] state))
 
