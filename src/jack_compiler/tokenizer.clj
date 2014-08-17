@@ -1,5 +1,13 @@
 (ns jack-compiler.tokenizer)
 
+(defn char-seq
+  "See <http://stackoverflow.com/questions/11669404/processing-a-file-character-by-character-in-clojure>"
+  [^java.io.BufferedReader rdr]
+  (let [chr (.read rdr)]
+    (if (>= chr 0)
+      (let [string-chr (-> chr char str)]
+        (cons string-chr (lazy-seq (char-seq rdr)))))))
+
 (def jack-keywords ["class"
                     "constructor"
                     "function"
@@ -140,7 +148,9 @@
     [:start [] [[:string (apply str current-token)]]]
     [:string (conj current-token chr) nil]))
 
-(defn token-seq
+(defmulti token-seq class)
+
+(defmethod token-seq :default
   [chrs]
   (loop [chr (first chrs)
          others (rest chrs)
@@ -151,3 +161,8 @@
         (if tokens
           (cons (first tokens) (lazy-seq (concat (rest tokens) (lazy-seq (token-seq others)))))
           (recur (first others) (rest others) new-state new-current-token))))))
+
+(defmethod token-seq java.io.BufferedReader
+  [reader]
+  (let [chrs (char-seq reader)]
+    (token-seq chrs)))
