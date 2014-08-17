@@ -54,25 +54,25 @@
 (defmulti process-chr (fn [state & args] state))
 
 (defmethod process-chr :start
-  [state chr current-token tokens]
+  [state chr current-token]
   (cond
     (re-matches #"\s" chr)
-    [:whitespace current-token tokens]
+    [:whitespace current-token nil]
 
     (= "/" chr)
-    [:maybe-comment-start current-token tokens]
+    [:maybe-comment-start current-token nil]
 
     (= "\"" chr)
-    [:string current-token tokens]
+    [:string current-token nil]
 
     (some #(= chr %) jack-symbols)
     [:start [] [[(keyword chr) chr]]]
 
     :else
-    [:token (conj current-token chr) tokens]))
+    [:token (conj current-token chr) nil]))
 
 (defmethod process-chr :token
-  [state chr current-token tokens]
+  [state chr current-token]
   (cond
     (re-matches #"\s" chr)
     (let [value (apply str current-token)
@@ -95,72 +95,70 @@
       [:whitespace [] [[token-type value] [(keyword chr) chr]]])
 
     :else
-    [:token (conj current-token chr) tokens]))
+    [:token (conj current-token chr) nil]))
 
 (defmethod process-chr :whitespace
-  [state chr current-token tokens]
+  [state chr current-token]
   (cond
     (re-matches #"\s" chr)
-    [:whitespace current-token tokens]
+    [:whitespace current-token nil]
 
     (= "/" chr)
-    [:maybe-comment-start current-token tokens]
+    [:maybe-comment-start current-token nil]
 
     (= "\"" chr)
-    [:string current-token tokens]
+    [:string current-token nil]
 
     :else
-    [:token (conj current-token chr) tokens]))
+    [:token (conj current-token chr) nil]))
 
 (defmethod process-chr :maybe-comment-start
-  [state chr current-token tokens]
+  [state chr current-token]
   (cond
     (= "/" chr)
-    [:newline-comment current-token tokens]
+    [:newline-comment current-token nil]
 
     (= "*" chr)
-    [:comment current-token tokens]
+    [:comment current-token nil]
 
     :else
     [:start current-token [[(keyword "/") "/"]]]))
 
 (defmethod process-chr :newline-comment
-  [state chr current-token tokens]
+  [state chr current-token]
   (if (= "\n" chr)
-    [:start current-token tokens]
-    [:newline-comment current-token tokens]))
+    [:start current-token nil]
+    [:newline-comment current-token nil]))
 
 (defmethod process-chr :comment
-  [state chr current-token tokens]
+  [state chr current-token]
   (if (= "*" chr)
-    [:maybe-comment-end current-token tokens]
-    [:comment current-token tokens]))
+    [:maybe-comment-end current-token nil]
+    [:comment current-token nil]))
 
 (defmethod process-chr :maybe-comment-end
-  [state chr current-token tokens]
+  [state chr current-token]
   (if (= "/" chr)
-    [:start current-token tokens]
-    [:comment current-token tokens]))
+    [:start current-token nil]
+    [:comment current-token nil]))
 
 (defmethod process-chr :string
-  [state chr current-token tokens]
+  [state chr current-token]
   (if (= "\"" chr)
     [:start [] [[:string (apply str current-token)]]]
-    [:string (conj current-token chr) tokens]))
+    [:string (conj current-token chr) nil]))
 
 (defn token-seq
   [chrs]
   (loop [chr (first chrs)
          others (rest chrs)
          state :start
-         current-token []
-         tokens nil]
+         current-token []]
     (if chr
-      (let [[new-state new-current-token new-tokens] (process-chr state chr current-token tokens)]
-        ; (println {"state" new-state "token" new-current-token})
+      (let [[new-state new-current-token tokens] (process-chr state chr current-token)]
         (if tokens
-          (cons (first tokens) (lazy-seq (concat (rest tokens) (lazy-seq (token-seq (cons chr others))))))
-          (recur (first others) (rest others) new-state new-current-token new-tokens))))))
+          (cons (first tokens) (lazy-seq (concat (rest tokens) (lazy-seq (token-seq others)))))
+          (recur (first others) (rest others) new-state new-current-token))))))
 
 (defn -main []
   (let [chrs (char-seq (java.io.BufferedReader. *in*))
