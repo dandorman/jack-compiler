@@ -27,18 +27,36 @@
                    :unary-op         [#{"-" "~"}]
                    :keyword-constant [#{"true" "false" "null" "this"}]})
 
+(declare analyze)
+
 (defn process-construct
   [grammar tokens construct ast]
   (let [token (first tokens)]
     (cond
       (instance? String construct)
-      [(rest tokens) (conj ast [:keyword (last token)])]
+      (if (= (last token) construct)
+        [(rest tokens) (conj ast [:keyword construct])]
+        (throw (Exception. (str "Invalid terminal " construct ", expected " (last token)))))
 
       (instance? clojure.lang.Keyword construct)
-      (throw (Exception. "Implement me!"))
+      (if (= (first token) construct)
+        (let [[new-tokens sub-ast] (analyze grammar tokens (construct grammar) [construct])]
+          [new-tokens (conj ast sub-ast)])
+        (throw (Exception. (str "Invalid non-terminal " construct ", expected " (last token)))))
+
+      (instance? clojure.lang.PersistentHashSet construct)
+      (if-let [result (first
+                        (remove nil?
+                                (map #(try
+                                        (process-construct grammar tokens % ast)
+                                        (catch Exception e
+                                          nil))
+                                     construct)))]
+        result
+        (throw (Exception. (str "Unrecognized token: " token))))
 
       :else
-      (throw (Exception. "Unexpected token: " token)))))
+      (throw (Exception. (str "Unexpected construct: " construct))))))
 
 (defn analyze
   ([tokens]
@@ -50,4 +68,4 @@
                 new-tokens
                 (rest constructs)
                 new-ast))
-     ast)))
+     [tokens ast])))
