@@ -28,6 +28,20 @@
         [tokens ast]
         [new-tokens new-ast]))))
 
+(defn literal
+  "Creates a function for handling an expected literal"
+  [expected-token-type]
+  (fn [grammar tokens ast]
+    (let [token      (first tokens)
+          token-type (first token)]
+      (if (= token-type expected-token-type)
+        [(rest tokens) (conj ast token)]
+        (throw (Exception. (str "Unexpected literal (" token "); expected " expected-token-type)))))))
+
+(def identifier (partial literal :identifier))
+(def integer    (partial literal :integer))
+(def string     (partial literal :string))
+
 (def jack-grammar {:class            ["class" :class-name "{" (any :class-var-dec) (any :subroutine-dec) "}"]
                    :class-var-dec    [#{"static" "field"} :type :var-name (any "," :var-name) ";"]
                    :type             [#{"int" "char" "boolean" :class-name}]
@@ -53,7 +67,10 @@
                    :expression-list  [(maybe :expression (any "," :expression))]
                    :op               [#{"+" "-" "*" "/" "&" "|" "<" ">" "="}]
                    :unary-op         [#{"-" "~"}]
-                   :keyword-constant [#{"true" "false" "null" "this"}]})
+                   :keyword-constant [#{"true" "false" "null" "this"}]
+                   :identifier       [(identifier)]
+                   :integer          [(integer)]
+                   :string           [(string)]})
 
 (defn process-construct
   [grammar tokens construct ast]
@@ -61,7 +78,7 @@
     (cond
       (instance? String construct)
       (if (= (last token) construct)
-        [(rest tokens) (conj ast [:keyword construct])]
+        [(rest tokens) (conj ast [(first token) construct])]
         (throw (Exception. (str "Invalid terminal " construct ", expected " (last token)))))
 
       (instance? clojure.lang.Keyword construct)

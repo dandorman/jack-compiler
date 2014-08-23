@@ -36,10 +36,10 @@
   [value]
   (cond
     (some #(= value %) jack-keywords)
-    (keyword (some (set [value]) jack-keywords))
+    :keyword
 
     (some #(= value %) jack-symbols)
-    (keyword (some (set [value]) jack-symbols))
+    :symbol
 
     (and (re-matches #"^\d{1,5}$" value)
          (< (Integer/parseInt value) 32767))
