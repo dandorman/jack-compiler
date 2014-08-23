@@ -32,10 +32,10 @@
   "Creates a function for handling an expected literal"
   [expected-token-type]
   (fn [grammar tokens ast]
-    (let [token      (first tokens)
-          token-type (first token)]
+    (let [token                    (first tokens)
+          [token-type token-value] token]
       (if (= token-type expected-token-type)
-        [(rest tokens) (conj ast token)]
+        [(rest tokens) (conj ast token-value)]
         (throw (Exception. (str "Unexpected literal (" token "); expected " expected-token-type)))))))
 
 (def identifier (partial literal :identifier))
@@ -45,7 +45,7 @@
 (def jack-grammar {:class            ["class" :class-name "{" (any :class-var-dec) (any :subroutine-dec) "}"]
                    :class-var-dec    [#{"static" "field"} :type :var-name (any "," :var-name) ";"]
                    :type             [#{"int" "char" "boolean" :class-name}]
-                   :subroutine-dec   [#{"constructor" "function" "method"} #{"void" :type}]
+                   :subroutine-dec   [#{"constructor" "function" "method"} #{"void" :type} :subroutine-name "(" :parameter-list ")" :subroutine-body]
                    :parameter-list   [(maybe :type :var-name (any "," :type :var-name))]
                    :subroutine-body  ["{" (any :var-dec) :statements "}"]
                    :var-dec          ["var" :type :var-name (any "," :var-name) ";"]

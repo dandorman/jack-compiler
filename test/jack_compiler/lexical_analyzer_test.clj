@@ -42,6 +42,26 @@
               [:class-var-dec [:keyword "field"] [:keyword "int"] [:identifier "foo"] [:symbol ";"]]
               [:class-var-dec [:keyword "field"] [:keyword "int"] [:identifier "bar"] [:symbol ";"]]
               [:symbol "}"]] ast))))
+
+  (testing "simple Jack class"
+    (let [tokens  [[:keyword "class"] [:identifier "Foo"] [:symbol "{"]
+                     [:keyword "field"] [:keyword "int"] [:identifier "foo"] [:symbol ";"]
+                     [:keyword "static"] [:keyword "char"] [:identifier "bar"] [:symbol ";"]
+                     [:keyword "method"] [:keyword "int"] [:identifier "baz"] [:symbol "("] [:symbol ")"] [:symbol "{"]
+                       [:keyword "return"] [:integer 1] [:symbol ";"]
+                     [:symbol "}"]
+                   [:symbol "}"]]
+          [_ ast] (analyze jack-grammar tokens (:class jack-grammar) [:class])]
+      (is (= [:class [:keyword "class"] [:class-name [:identifier "Foo"]] [:symbol "{"]
+              [:class-var-dec [:keyword "field"] [:type [:keyword "int"]] [:var-name [:identifier "foo"]] [:symbol ";"]]
+              [:class-var-dec [:keyword "static"] [:type [:keyword "char"]] [:var-name [:identifier "bar"]] [:symbol ";"]]
+              [:subroutine-dec [:keyword "method"] [:type [:keyword "int"]] [:subroutine-name [:identifier "baz"]] [:symbol "("] [:parameter-list] [:symbol ")"]
+               [:subroutine-body [:symbol "{"]
+                [:statements
+                 [:statement
+                  [:return-statement [:keyword "return"] [:expression [:term [:integer 1]]] [:symbol ";"]]]]
+                [:symbol "}"]]]
+              [:symbol "}"]] ast))))
   )
 
 (deftest process-construct-test

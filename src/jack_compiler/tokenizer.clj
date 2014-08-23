@@ -66,7 +66,7 @@
     [:string current-token nil]
 
     (some #(= chr %) jack-symbols)
-    [:start [] [[(keyword chr) chr]]]
+    [:start [] [[:symbol chr]]]
 
     :else
     [:token (conj current-token chr) nil]))
@@ -92,7 +92,7 @@
     (some #(= chr %) jack-symbols)
     (let [value (apply str current-token)
           token-type (classify-token value)]
-      [:whitespace [] [[token-type value] [(keyword chr) chr]]])
+      [:whitespace [] [[token-type value] [:symbol chr]]])
 
     :else
     [:token (conj current-token chr) nil]))
@@ -109,6 +109,9 @@
     (= "\"" chr)
     [:string current-token nil]
 
+    (some #(= chr %) jack-symbols)
+    [:start [] [[:symbol chr]]]
+
     :else
     [:token (conj current-token chr) nil]))
 
@@ -122,7 +125,7 @@
     [:comment current-token nil]
 
     :else
-    [:start current-token [[(keyword "/") "/"]]]))
+    [:start current-token [[:symbol "/"]]]))
 
 (defmethod process-chr :newline-comment
   [state chr current-token]
