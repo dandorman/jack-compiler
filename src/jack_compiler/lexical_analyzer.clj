@@ -106,13 +106,15 @@
 
 (defn process-constructs
   [grammar tokens constructs ast]
-  (if-let [construct (first constructs)]
-    (let [[new-tokens new-ast] (process-construct grammar tokens construct ast)]
-      (process-constructs grammar
-                          new-tokens
-                          (rest constructs)
-                          new-ast))
-    [tokens ast]))
+  (loop [tokens     tokens
+         constructs constructs
+         ast        ast]
+    (if-let [construct (first constructs)]
+      (let [[new-tokens new-ast] (process-construct grammar tokens construct ast)]
+        (recur new-tokens
+               (rest constructs)
+               new-ast))
+      [tokens ast])))
 
 (defn analyze
   [tokens]
