@@ -118,4 +118,4 @@
 
 (defn analyze
   [tokens]
-  (process-constructs jack-grammar tokens (:class jack-grammar) [:class]))
+  (last (process-constructs jack-grammar tokens (:class jack-grammar) [:class])))
