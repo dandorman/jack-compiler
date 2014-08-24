@@ -1,6 +1,6 @@
 (ns jack-compiler.lexical-analyzer)
 
-(declare analyze)
+(declare process-constructs)
 
 (defn any
   "Builds a function that can match zero or more repetitions of its arguments."
@@ -9,7 +9,7 @@
     (loop [tokens tokens
            ast    ast]
       (let [[new-tokens new-ast] (try
-                                   (analyze grammar tokens constructs ast)
+                                   (process-constructs grammar tokens constructs ast)
                                    (catch Exception e
                                      [:error]))]
         (if (= :error new-tokens)
@@ -21,7 +21,7 @@
   [& constructs]
   (fn [grammar tokens ast]
     (let [[new-tokens new-ast] (try
-                                 (analyze grammar tokens constructs ast)
+                                 (process-constructs grammar tokens constructs ast)
                                  (catch Exception e
                                    [:error]))]
       (if (= :error new-tokens)
@@ -82,7 +82,7 @@
         (throw (Exception. (str "Invalid terminal " construct ", expected " (last token)))))
 
       (instance? clojure.lang.Keyword construct)
-      (let [[new-tokens sub-ast] (analyze grammar tokens (construct grammar) [construct])]
+      (let [[new-tokens sub-ast] (process-constructs grammar tokens (construct grammar) [construct])]
         [new-tokens (conj ast sub-ast)])
 
       (instance? clojure.lang.PersistentHashSet construct)
@@ -90,7 +90,7 @@
                         (remove nil?
                                 (map #(try
                                         (if (instance? clojure.lang.PersistentVector %)
-                                          (analyze grammar tokens % ast)
+                                          (process-constructs grammar tokens % ast)
                                           (process-construct grammar tokens % ast))
                                         (catch Exception e
                                           nil))
@@ -104,14 +104,14 @@
       :else
       (throw (Exception. (str "Unexpected construct: " construct))))))
 
-(defn analyze
+(defn process-constructs
   ([tokens]
-   (analyze jack-grammar tokens (:class jack-grammar) [:class]))
+   (process-constructs jack-grammar tokens (:class jack-grammar) [:class]))
   ([grammar tokens constructs ast]
    (if-let [construct (first constructs)]
      (let [[new-tokens new-ast] (process-construct grammar tokens construct ast)]
-       (analyze grammar
-                new-tokens
-                (rest constructs)
-                new-ast))
+       (process-constructs grammar
+                           new-tokens
+                           (rest constructs)
+                           new-ast))
      [tokens ast])))

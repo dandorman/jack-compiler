@@ -2,31 +2,31 @@
   (:require [clojure.test :refer :all]
             [jack-compiler.lexical-analyzer :refer :all]))
 
-(deftest analyze-test
+(deftest process-constructs-test
 
   (testing "non-terminal -> terminal"
     (let [grammar {:foo ["foo"]}
           tokens  [[:foo "foo"]]
-          [_ ast] (analyze grammar tokens (:foo grammar) [:foo])]
+          [_ ast] (process-constructs grammar tokens (:foo grammar) [:foo])]
       (is (= [:foo [:foo "foo"]] ast))))
 
   (testing "non-terminal -> terminal terminal"
     (let [grammar {:foo ["foo" "bar"]}
           tokens  [[:foo "foo"] [:bar "bar"]]
-          [_ ast] (analyze grammar tokens (:foo grammar) [:foo])]
+          [_ ast] (process-constructs grammar tokens (:foo grammar) [:foo])]
       (is (= [:foo [:foo "foo"] [:bar "bar"]] ast))))
 
   (testing "non-terminal -> non-terminal -> terminal"
     (let [grammar {:foo [:bar]
                    :bar ["bar"]}
           tokens  [[:bar "bar"]]
-          [_ ast] (analyze grammar tokens (:foo grammar) [:foo])]
+          [_ ast] (process-constructs grammar tokens (:foo grammar) [:foo])]
       (is (= [:foo [:bar [:bar "bar"]]] ast))))
 
   (testing "any"
     (let [grammar {:foo ["bar" (any "baz") "qux"]}
           tokens  [[:bar "bar"] [:baz "baz"] [:baz "baz"] [:qux "qux"]]
-          [_ ast] (analyze grammar tokens (:foo grammar) [:foo])]
+          [_ ast] (process-constructs grammar tokens (:foo grammar) [:foo])]
       (is (= [:foo [:bar "bar"] [:baz "baz"] [:baz "baz"] [:qux "qux"]] ast))))
 
   (testing "kinda class"
@@ -37,7 +37,7 @@
                    [:keyword "field"] [:keyword "int"] [:identifier "foo"] [:symbol ";"]
                    [:keyword "field"] [:keyword "int"] [:identifier "bar"] [:symbol ";"]
                    [:symbol "}"]]
-          [_ ast] (analyze grammar tokens (:class grammar) [:class])]
+          [_ ast] (process-constructs grammar tokens (:class grammar) [:class])]
       (is (= [:class [:keyword "class"] [:class-name [:identifier "Foo"]] [:symbol "{"]
               [:class-var-dec [:keyword "field"] [:keyword "int"] [:identifier "foo"] [:symbol ";"]]
               [:class-var-dec [:keyword "field"] [:keyword "int"] [:identifier "bar"] [:symbol ";"]]
@@ -45,13 +45,13 @@
 
   (testing "simple Jack class"
     (let [tokens  [[:keyword "class"] [:identifier "Foo"] [:symbol "{"]
-                     [:keyword "field"] [:keyword "int"] [:identifier "foo"] [:symbol ";"]
-                     [:keyword "static"] [:keyword "char"] [:identifier "bar"] [:symbol ";"]
-                     [:keyword "method"] [:keyword "int"] [:identifier "baz"] [:symbol "("] [:symbol ")"] [:symbol "{"]
-                       [:keyword "return"] [:integer 1] [:symbol ";"]
-                     [:symbol "}"]
+                   [:keyword "field"] [:keyword "int"] [:identifier "foo"] [:symbol ";"]
+                   [:keyword "static"] [:keyword "char"] [:identifier "bar"] [:symbol ";"]
+                   [:keyword "method"] [:keyword "int"] [:identifier "baz"] [:symbol "("] [:symbol ")"] [:symbol "{"]
+                   [:keyword "return"] [:integer 1] [:symbol ";"]
+                   [:symbol "}"]
                    [:symbol "}"]]
-          [_ ast] (analyze jack-grammar tokens (:class jack-grammar) [:class])]
+          [_ ast] (process-constructs jack-grammar tokens (:class jack-grammar) [:class])]
       (is (= [:class [:keyword "class"] [:class-name [:identifier "Foo"]] [:symbol "{"]
               [:class-var-dec [:keyword "field"] [:type [:keyword "int"]] [:var-name [:identifier "foo"]] [:symbol ";"]]
               [:class-var-dec [:keyword "static"] [:type [:keyword "char"]] [:var-name [:identifier "bar"]] [:symbol ";"]]
