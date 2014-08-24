@@ -105,13 +105,15 @@
       (throw (Exception. (str "Unexpected construct: " construct))))))
 
 (defn process-constructs
-  ([tokens]
-   (process-constructs jack-grammar tokens (:class jack-grammar) [:class]))
-  ([grammar tokens constructs ast]
-   (if-let [construct (first constructs)]
-     (let [[new-tokens new-ast] (process-construct grammar tokens construct ast)]
-       (process-constructs grammar
-                           new-tokens
-                           (rest constructs)
-                           new-ast))
-     [tokens ast])))
+  [grammar tokens constructs ast]
+  (if-let [construct (first constructs)]
+    (let [[new-tokens new-ast] (process-construct grammar tokens construct ast)]
+      (process-constructs grammar
+                          new-tokens
+                          (rest constructs)
+                          new-ast))
+    [tokens ast]))
+
+(defn analyze
+  [tokens]
+  (process-constructs jack-grammar tokens (:class jack-grammar) [:class]))
