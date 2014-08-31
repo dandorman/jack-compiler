@@ -76,20 +76,20 @@
   [grammar tokens construct ast]
   (let [token (first tokens)]
     (cond
-      (instance? String construct)
+      (string? construct)
       (if (= (last token) construct)
         [(rest tokens) (conj ast [(first token) construct])]
         (throw (Exception. (str "Invalid terminal " construct ", expected " (last token)))))
 
-      (instance? clojure.lang.Keyword construct)
+      (keyword? construct)
       (let [[new-tokens sub-ast] (process-constructs grammar tokens (construct grammar) [construct])]
         [new-tokens (conj ast sub-ast)])
 
-      (instance? clojure.lang.PersistentHashSet construct)
+      (set? construct)
       (if-let [result (first
                         (remove nil?
                                 (map #(try
-                                        (if (instance? clojure.lang.PersistentVector %)
+                                        (if (vector? %)
                                           (process-constructs grammar tokens % ast)
                                           (process-construct grammar tokens % ast))
                                         (catch Exception e
