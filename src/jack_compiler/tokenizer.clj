@@ -8,37 +8,37 @@
       (let [string-chr (-> chr char str)]
         (cons string-chr (lazy-seq (char-seq rdr)))))))
 
-(def jack-keywords ["class"
-                    "constructor"
-                    "function"
-                    "method"
-                    "field"
-                    "static"
-                    "var"
-                    "int"
-                    "char"
-                    "boolean"
-                    "void"
-                    "true"
-                    "false"
-                    "null"
-                    "this"
-                    "let"
-                    "do"
-                    "if"
-                    "else"
-                    "while"
-                    "return"])
+(def jack-keywords #{"class"
+                     "constructor"
+                     "function"
+                     "method"
+                     "field"
+                     "static"
+                     "var"
+                     "int"
+                     "char"
+                     "boolean"
+                     "void"
+                     "true"
+                     "false"
+                     "null"
+                     "this"
+                     "let"
+                     "do"
+                     "if"
+                     "else"
+                     "while"
+                     "return"})
 
-(def jack-symbols ["{" "}" "(" ")" "[" "]" "." "," ";" "+" "-" "*" "/" "&" "|" "<" ">" "=" "-"])
+(def jack-symbols #{"{" "}" "(" ")" "[" "]" "." "," ";" "+" "-" "*" "/" "&" "|" "<" ">" "=" "~"})
 
 (defn classify-token
   [value]
   (cond
-    (some #(= value %) jack-keywords)
+    (contains? jack-keywords value)
     :keyword
 
-    (some #(= value %) jack-symbols)
+    (contains? jack-symbols value)
     :symbol
 
     (and (re-matches #"^\d{1,5}$" value)
@@ -65,7 +65,7 @@
     (= "\"" chr)
     [:string current-token nil]
 
-    (some #(= chr %) jack-symbols)
+    (contains? jack-symbols chr)
     [:start [] [[:symbol chr]]]
 
     :else
@@ -89,10 +89,10 @@
           token-type (classify-token value)]
       [:string [] [[token-type value]]])
 
-    (some #(= chr %) jack-symbols)
+    (contains? jack-symbols chr)
     (let [value (apply str current-token)
           token-type (classify-token value)]
-      [:whitespace [] [[token-type value] [:symbol chr]]])
+      [:start [] [[token-type value] [:symbol chr]]])
 
     :else
     [:token (conj current-token chr) nil]))
@@ -109,7 +109,7 @@
     (= "\"" chr)
     [:string current-token nil]
 
-    (some #(= chr %) jack-symbols)
+    (contains? jack-symbols chr)
     [:start [] [[:symbol chr]]]
 
     :else
