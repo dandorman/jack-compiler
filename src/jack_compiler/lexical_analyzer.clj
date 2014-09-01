@@ -1,6 +1,6 @@
 (ns jack-compiler.lexical-analyzer)
 
-(declare process-constructs)
+(declare process-constructs process-construct)
 
 (defn any
   "Builds a function that can match zero or more repetitions of its arguments."
@@ -42,6 +42,30 @@
 (def integer    (partial literal :integer))
 (def string     (partial literal :string))
 
+(defn term
+  "Handles the `term` non-terminal. A cruddy kludge :'("
+  [grammar tokens ast]
+  (let [[token-type token-value] (first tokens)]
+    (cond
+      (= :identifier token-type)
+      (let [[next-type next-value] (second tokens)]
+        (if (= :symbol next-type)
+          (cond
+            (= "[" next-value)
+            (process-constructs grammar tokens [:var-name "[" :expression "]"] ast)
+
+            (or (= "(" next-value)
+                (= "." next-value))
+            (let [[new-tokens sub-ast] (process-constructs grammar tokens (:subroutine-call grammar) [:subroutine-call])]
+              [new-tokens (conj ast sub-ast)])
+
+            :else
+            (process-constructs grammar tokens [:var-name] ast))
+          (process-constructs grammar tokens [:var-name] ast)))
+
+      :else
+      (process-construct grammar tokens #{:integer :string :keyword-constant ["(" :expression ")"] [:unary-op :term]} ast))))
+
 (def jack-grammar {:class            ["class" :class-name "{" (any :class-var-dec) (any :subroutine-dec) "}"]
                    :class-var-dec    [#{"static" "field"} :type :var-name (any "," :var-name) ";"]
                    :type             [#{"int" "char" "boolean" :class-name}]
@@ -62,7 +86,7 @@
                    :return-statement ["return" (maybe :expression) ";"]
 
                    :expression       [:term (any :op :term)]
-                   :term             [#{:integer :string :keyword-constant [:var-name (maybe "[" :expression "]")] :subroutine-call ["(" :expression ")"] [:unary-op :term]}]
+                   :term             [term]
                    :subroutine-call  [#{[:subroutine-name "(" :expression-list ")"] [#{:class-name :var-name} "." :subroutine-name "(" :expression-list ")"]}]
                    :expression-list  [(maybe :expression (any "," :expression))]
                    :op               [#{"+" "-" "*" "/" "&" "|" "<" ">" "="}]
