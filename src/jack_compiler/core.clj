@@ -1,15 +1,8 @@
 (ns jack-compiler.core
   (:require [clojure.java.io :as io]
-            [jack-compiler.tokenizer :as tokenizer]
+            [jack-compiler.tokenizer :refer [token-seq]]
             [jack-compiler.lexical-analyzer :refer [analyze]]
-            [jack-compiler.xml-formatter :refer [fmt]]))
-
-(comment (defn -main [& args]
-  (doseq [filename *command-line-args*]
-    (with-open [rdr (io/reader filename)]
-      (let [tokens (tokenizer/token-seq rdr)
-            ast    (analyze tokens)]
-        (print (fmt ast)))))))
+            [jack-compiler.compiler :as compiler]))
 
 (defn basename [filename]
   (re-find #"^(?:[^.]+)" filename))
@@ -32,8 +25,10 @@
   (if-let [file (io/file (first *command-line-args*))]
     (doseq [filename (jack-files file)]
       (with-open [rdr (io/reader filename)]
-        (let [tokens (tokenizer/token-seq rdr)
+        (let [tokens (token-seq rdr)
               ast    (analyze tokens)
               output (str (basename filename) ".xml")]
-          (with-open [wrtr (io/writer output)]
-            (.write wrtr (fmt ast))))))))
+          (doseq [line (compiler/compile-jack ast)]
+            (println line))
+          (comment (with-open [wrtr (io/writer output)]
+            (.write wrtr (compiler/compile-jack ast)))))))))
