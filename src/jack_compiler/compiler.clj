@@ -29,6 +29,9 @@
 (defn extract-method-name [ast]
   (last (last (attr (rest ast) :subroutine-name))))
 
+(defn extract-method-type [ast]
+  (last (attr (rest ast) :keyword)))
+
 (defn extract-parameter-list [ast]
   (let [tokens (rest (attr (rest ast) :parameter-list))]
     (->> tokens
@@ -41,10 +44,16 @@
         name  (attr-var-name attrs)
         scope "argument"
         index (count (filter #(= scope (:kind %)) (vals dict)))]
-    (assoc dict name {:kind scope :type type :index index})))
+    (assoc dict name {:kind  scope
+                      :type  type
+                      :index index})))
 
-(defn extract-parameters [ast]
-  (reduce extract-parameter {} (extract-parameter-list ast)))
+(defn extract-parameters [ast method-type class-name]
+  (let [dict (if (= "method" method-type)
+               {"this" {:kind  "argument"
+                        :type  class-name
+                        :index 0}})]
+    (reduce extract-parameter dict (extract-parameter-list ast))))
 
 (defn extract-method-body [ast]
   (->> (attr (rest ast) :subroutine-body)
@@ -58,7 +67,9 @@
         name  (attr-var-name attrs)
         scope "var"
         index (count (filter #(= scope (:kind %)) (vals dict)))]
-    (assoc dict name {:kind scope :type type :index index})))
+    (assoc dict name {:kind  scope
+                      :type  type
+                      :index index})))
 
 (defn extract-locals [ast]
   (let [var-decs (take-while #(= :var-dec (first %)) ast)]
@@ -66,6 +77,13 @@
 
 (defn extract-statements [ast]
   (map #(->> % rest first) (rest (attr ast :statements))))
+
+(defn extract-expressions [ast]
+  (println (attr ast :expression-list))
+  (let [tokens (rest (attr (rest ast) :expression-list))]
+    (->> tokens
+         (partition-by #(not= [:symbol ","] %))
+         (take-nth 2))))
 
 (def scopes {"var"   "local"
              "field" "this"})
@@ -78,7 +96,7 @@
   [ast]
   (->> ast
        (filter #(= :term (first %)))
-       (map (comp first rest))))
+       (map rest)))
 
 (defn extract-ops
   [ast]
@@ -86,16 +104,31 @@
        (filter #(= :op (first %)))
        (map (comp last first rest))))
 
-(defmulti compile-term (fn [[term _] _] term))
+(defmulti compile-unary-op identity)
+
+(defmethod compile-unary-op "-"
+  [_]
+  ["neg"])
+
+(defmethod compile-unary-op "~"
+  [_]
+  ["not"])
+
+(defmulti compile-term (fn [[[term _] _] _] term))
 
 (defmethod compile-term :var-name
-  [[_ [_ var-name]] lookup-table]
+  [[[_ [_ var-name]]] lookup-table]
   (let [var-info (get lookup-table var-name)]
     [(str "push " (var-ref var-info))]))
 
 (defmethod compile-term :integer
-  [[_ value] _]
+  [[[_ value]] _]
   [(str "push constant " value)])
+
+(defmethod compile-term :unary-op
+  [[[_ [_ unary-op]] [_ term]] lookup-table]
+  [(compile-term [term] lookup-table)
+   (compile-unary-op unary-op)])
 
 (defmethod compile-term :default
   [& args]
@@ -107,9 +140,41 @@
   [_]
   ["add"])
 
+(defmethod compile-op "-"
+  [_]
+  ["sub"])
+
+(defmethod compile-op "*"
+  [_]
+  ["call Math.multiply 2"])
+
+(defmethod compile-op "/"
+  [_]
+  ["call Math.divide 2"])
+
+(defmethod compile-op "&"
+  [_]
+  ["and"])
+
+(defmethod compile-op "|"
+  [_]
+  ["and"])
+
+(defmethod compile-op "<"
+  [_]
+  ["lt"])
+
+(defmethod compile-op ">"
+  [_]
+  ["gt"])
+
+(defmethod compile-op "="
+  [_]
+  ["eq"])
+
 (defn compile-expression
   [ast lookup-table]
-  (let [[first-term & other-terms] (extract-terms ast)
+  (let [[first-term & other-terms :as terms] (extract-terms ast)
         ops                      (extract-ops ast)]
     (flatten (concat [(compile-term first-term lookup-table)]
                      (for [term other-terms
@@ -117,16 +182,30 @@
                        [(compile-term term lookup-table)
                         (compile-op op)])))))
 
+(defn extract-subroutine-name
+  [[_ & ast]]
+  (let [identifiers (take-while #(not= [:symbol "("] %) ast)
+        [[_ [_ class-or-method]] _ [_ [_ method]]] identifiers]
+    (clojure.string/join "." (filter (comp not nil?) [class-or-method method]))))
+
 (defmulti compile-statement (fn [ast _] (first ast)))
 
 (defmethod compile-statement :let-statement
   [[_ & ast] lookup-table]
-  (comment println ast)
   (let [var-name   (attr-var-name ast)
         var-info   (get lookup-table var-name)
         expression (compile-expression (rest (attr ast :expression)) lookup-table)]
     (flatten (concat expression
                      [(str "pop " (var-ref var-info))]))))
+
+(defmethod compile-statement :do-statement
+  [[_ & ast] lookup-table]
+  (let [subroutine-name (extract-subroutine-name (attr ast :subroutine-call))
+        expression-list (attr (rest (attr ast :subroutine-call)) :expression-list)
+        expressions     (extract-expressions expression-list)
+        arg-count       0]
+    (println expressions)
+    (flatten (concat [(format "call %s %d" subroutine-name arg-count)]))))
 
 (defmethod compile-statement :return-statement
   [ast lookup-table]
@@ -142,12 +221,13 @@
         lookup-table   (merge lookup-table locals)
         statement-asts (extract-statements body)
         statements     (map #(compile-statement % lookup-table) statement-asts)]
-    (flatten (concat [(str "function " class-name "." method-name " " (count locals))]
+    (flatten (concat [(format "function %s.%s %d" class-name method-name (count locals))]
                      statements))))
 
 (defn compile-method [class-name class-vars method]
   (let [method-name (extract-method-name method)
-        parameters  (extract-parameters method)
+        method-type (extract-method-type method)
+        parameters  (extract-parameters method method-type class-name)
         method-body (compile-method-body class-name method-name (merge class-vars parameters) method)]
     method-body))
 
