@@ -79,11 +79,10 @@
   (map #(->> % rest first) (rest (attr ast :statements))))
 
 (defn extract-expressions [ast]
-  (println (attr ast :expression-list))
-  (let [tokens (rest (attr (rest ast) :expression-list))]
+  (let [tokens (rest ast)]
     (->> tokens
-         (partition-by #(not= [:symbol ","] %))
-         (take-nth 2))))
+         (filter #(= :expression (first %)))
+         (map rest))))
 
 (def scopes {"var"   "local"
              "field" "this"})
@@ -114,6 +113,8 @@
   [_]
   ["not"])
 
+(declare compile-expression)
+
 (defmulti compile-term (fn [[[term _] _] _] term))
 
 (defmethod compile-term :var-name
@@ -129,6 +130,10 @@
   [[[_ [_ unary-op]] [_ term]] lookup-table]
   [(compile-term [term] lookup-table)
    (compile-unary-op unary-op)])
+
+(defmethod compile-term :symbol
+  [[_ & [expression _]] lookup-table]
+  (compile-expression (rest expression) lookup-table))
 
 (defmethod compile-term :default
   [& args]
@@ -203,13 +208,15 @@
   (let [subroutine-name (extract-subroutine-name (attr ast :subroutine-call))
         expression-list (attr (rest (attr ast :subroutine-call)) :expression-list)
         expressions     (extract-expressions expression-list)
-        arg-count       0]
-    (println expressions)
-    (flatten (concat [(format "call %s %d" subroutine-name arg-count)]))))
+        arg-count       (count expressions)]
+    (flatten (concat (map #(compile-expression % lookup-table) expressions)
+                     [(format "call %s %d" subroutine-name arg-count)]))))
 
 (defmethod compile-statement :return-statement
   [ast lookup-table]
-  ["return statement"])
+  (if-let [expression (attr (rest ast) :expression)]
+    (flatten (concat (compile-expression (rest expression) lookup-table) ["return"]))
+    ["push constant 0" "return" "pop temp 0"]))
 
 (defmethod compile-statement :default
   [& args]
