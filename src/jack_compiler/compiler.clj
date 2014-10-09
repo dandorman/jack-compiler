@@ -65,11 +65,12 @@
   (let [attrs (rest ast)
         type  (attr-type attrs)
         name  (attr-var-name attrs)
+        names (->> attrs
+                   (filter #(= :var-name (first %)))
+                   (map #(last (first (rest %)))))
         scope "var"
-        index (count (filter #(= scope (:kind %)) (vals dict)))]
-    (assoc dict name {:kind  scope
-                      :type  type
-                      :index index})))
+        index (fn [dict] (count (filter #(= scope (:kind %)) (vals dict))))]
+    (reduce #(assoc %1 %2 {:kind scope, :type type, :index (index %1)}) dict names)))
 
 (defn extract-locals [ast]
   (let [var-decs (take-while #(= :var-dec (first %)) ast)]
@@ -137,7 +138,7 @@
 
 (defmethod compile-term :default
   [& args]
-  (println "default term"))
+  (println "default term" args))
 
 (defmulti compile-op identity)
 
@@ -220,7 +221,7 @@
 
 (defmethod compile-statement :default
   [& args]
-  (println "default!" args))
+  (comment println "default!" args))
 
 (defn compile-method-body [class-name method-name lookup-table ast]
   (let [body           (extract-method-body ast)
